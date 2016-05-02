@@ -91,9 +91,6 @@
 //Duration loop timeout in ms (effective background repeat/iteration time)
 #define DUR_LOOP_TIMEOUT 105
 
-//Make compatible with MP1.11 and later versions if defined
-#define BITRATE_REPORT
-
 #define MAX_REG_LENGTH 256
 
 using namespace std;
@@ -132,9 +129,7 @@ DECLARE_INTERFACE_(ITSReaderCallback, IUnknown)
 {
 	STDMETHOD(OnMediaTypeChanged) (int mediaTypes)PURE;	
 	STDMETHOD(OnVideoFormatChanged) (int streamType,int width,int height,int aspectRatioX,int aspectRatioY,int bitrate,int isInterlaced)PURE;	
-#ifdef BITRATE_REPORT
 	STDMETHOD(OnBitRateChanged) (int bitrate)PURE;	
-#endif
 };
 
 DECLARE_INTERFACE_(ITSReaderAudioChange, IUnknown)
