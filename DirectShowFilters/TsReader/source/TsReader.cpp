@@ -1057,6 +1057,7 @@ STDMETHODIMP CTsReaderFilter::Load(LPCOLESTR pszFileName,const AM_MEDIA_TYPE *pm
   m_bRecording=false ;
   m_isUNCfile = false;
   m_updateThreadDuration.StopUpdate(false);
+  DWORD startTimeout = 10000;
 
   wcscpy(m_fileName, pszFileName);
   char url[MAX_PATH];
@@ -1085,15 +1086,16 @@ STDMETHODIMP CTsReaderFilter::Load(LPCOLESTR pszFileName,const AM_MEDIA_TYPE *pm
     m_tickCount = GET_TIME_NOW();
     m_fileReader = new CMemoryReader(m_buffer);
     m_demultiplexer.SetFileReader(m_fileReader);
-    if (!m_demultiplexer.Start())
+    if (!m_demultiplexer.Start(startTimeout))
     {
       LogDebug("close rtsp:%s", url);
       m_buffer.Run(false);
       m_rtspClient.Stop();
       return E_FAIL;
     }
+    
+    //Stop streaming
     m_buffer.Run(false);
-
     LogDebug("close rtsp:%s", url);
     m_rtspClient.Stop();
 
@@ -1134,7 +1136,7 @@ STDMETHODIMP CTsReaderFilter::Load(LPCOLESTR pszFileName,const AM_MEDIA_TYPE *pm
 
     //get audio /video pids
     m_demultiplexer.SetFileReader(m_fileReader);
-    if (!m_demultiplexer.Start())
+    if (!m_demultiplexer.Start(startTimeout))
     {
       // stop streaming
       m_buffer.Run(false);
@@ -1144,6 +1146,7 @@ STDMETHODIMP CTsReaderFilter::Load(LPCOLESTR pszFileName,const AM_MEDIA_TYPE *pm
     }
 
     // stop streaming
+    m_buffer.Run(false);
     LogDebug("close rtsp:%s", url);
     m_rtspClient.Stop();
 
@@ -1174,6 +1177,7 @@ STDMETHODIMP CTsReaderFilter::Load(LPCOLESTR pszFileName,const AM_MEDIA_TYPE *pm
       m_bLiveTv = false ;
       m_fileReader = new FileReader();
       m_fileDuration = new FileReader();
+      startTimeout = m_isUNCfile ? 4000 : 2000;
     }
     else
     {
@@ -1193,7 +1197,7 @@ STDMETHODIMP CTsReaderFilter::Load(LPCOLESTR pszFileName,const AM_MEDIA_TYPE *pm
 
     //detect audio/video pids
     m_demultiplexer.SetFileReader(m_fileReader);
-    if (!m_demultiplexer.Start())
+    if (!m_demultiplexer.Start(startTimeout))
     {
       m_fileReader->CloseFile();
       m_fileDuration->CloseFile();
