@@ -1195,6 +1195,8 @@ STDMETHODIMP CTsReaderFilter::Load(LPCOLESTR pszFileName,const AM_MEDIA_TYPE *pm
     m_demultiplexer.SetFileReader(m_fileReader);
     if (!m_demultiplexer.Start())
     {
+      m_fileReader->CloseFile();
+      m_fileDuration->CloseFile();
       return E_FAIL;
     }
 
