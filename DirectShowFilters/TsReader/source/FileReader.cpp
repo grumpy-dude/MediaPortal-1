@@ -387,7 +387,7 @@ HRESULT FileReader::Read(PBYTE pbData, ULONG lDataLength, ULONG *dwReadBytes)
 
 	if (*dwReadBytes < (ULONG)lDataLength)
   {
-    LogDebug("FileReader::Read() read to less bytes");
+    //LogDebug("FileReader::Read() read to less bytes");
 		return S_FALSE;
   }
 	return S_OK;

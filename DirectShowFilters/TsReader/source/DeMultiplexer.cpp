@@ -951,7 +951,7 @@ bool CDeMultiplexer::CheckCompensation(CRefTime rtStartTime)
 /// Starts the demuxer
 /// This method will read the file until we found the pat/sdt
 /// with all the audio/video pids
-void CDeMultiplexer::Start()
+bool CDeMultiplexer::Start()
 {
   //reset some values
   m_bStarting=true ;
@@ -1012,15 +1012,17 @@ void CDeMultiplexer::Start()
       DelegatedFlush(true, false);
       m_streamPcr.Reset();
       m_bStarting=false;
-	    LogDebug("demux:Start() end1 BytesProcessed:%d, DTS/PTS count = %d/%d, GOPts = %d", dwBytesProcessed, m_vidDTScount, m_vidPTScount, m_bUsingGOPtimestamp);
-      return;
+	    LogDebug("demux:Start() Succeeded: BytesProcessed:%d, DTS/PTS count = %d/%d, GOPts = %d", dwBytesProcessed, m_vidDTScount, m_vidPTScount, m_bUsingGOPtimestamp);
+      return true;
     }
     dwBytesProcessed+=BytesRead;
+    Sleep(1);
   }
   m_streamPcr.Reset();
   m_iAudioReadCount=0;
   m_bStarting=false;
-	LogDebug("demux:Start() end2 BytesProcessed:%d, DTS/PTS count = %d/%d", dwBytesProcessed, m_vidDTScount, m_vidPTScount);
+	LogDebug("demux:Start() Failed due to timeout: BytesProcessed:%d, DTS/PTS count = %d/%d", dwBytesProcessed, m_vidDTScount, m_vidPTScount);
+  return false;
 }
 
 void CDeMultiplexer::SetEndOfFile(bool bEndOfFile)
@@ -3255,12 +3257,6 @@ void CDeMultiplexer::ThreadProc()
           )
       {
         m_bReadAheadFromFile = false;
-        if (retryRead && m_filter.m_bEnableBufferLogging)
-        {
-          int ACnt, VCnt;
-          GetBufferCounts(&ACnt, &VCnt);
-          LogDebug("CDeMultiplexer::ThreadProc - Retry read end, A/V/time = %d/%d/%d, sizeReadTemp=%d, sizeRead=%d", ACnt, VCnt, timeNow-lastRetryLoopTime, sizeReadTemp, sizeRead) ; 
-        }
         sizeRead = 0;
         retryRead = false;
       }
