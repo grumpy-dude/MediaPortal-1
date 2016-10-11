@@ -575,40 +575,102 @@ namespace TvPlugin
     /// <summary>
     /// Changes the current channel (based on channel number) after a specified delay.
     /// </summary>
-    /// <param name="channelNr">The nr of the channel to change to.</param>
-    /// <param name="useZapDelay">If true, the configured zap delay is used. Otherwise it zaps immediately.</param>
-    public void ZapToChannelNumber(int channelNr, bool useZapDelay)
+    /// <param name="aChannelNumber">The nr of the channel to change to.</param>
+    /// <param name="aUseZapDelay">If true, the configured zap delay is used. Otherwise it zaps immediately.</param>
+    public void ZapToChannelNumber(int aChannelNumber, bool aUseZapDelay)
     {
-      IList<GroupMap> channels = CurrentGroup.ReferringGroupMap();
-      if (channelNr >= 0)
+      if (aChannelNumber < 0)
       {
-        Log.Debug("channels.Count {0}", channels.Count);
+        // Only positive channel numbers are supported
+        return;
+      }
 
-        bool found = false;
-        int iCounter = 0;
-        Channel chan;
-        while (iCounter < channels.Count && found == false)
-        {
-          chan = ((GroupMap)channels[iCounter]).ReferencedChannel();
+      ChannelGroup allChannelsGroup = null;
 
-          Log.Debug("chan {0}", chan.DisplayName);
-          if (chan.VisibleInGuide)
-          {
-            if (chan.ChannelNumber == channelNr)
-            {
-              Log.Debug("find channel: iCounter {0}, chan.ChannelNumber {1}, chan.DisplayName {2}, channels.Count {3}",
-                        iCounter, chan.ChannelNumber, chan.DisplayName, channels.Count);
-              found = true;
-              ZapToChannel(iCounter + 1, useZapDelay);
-            }
-          }
-          iCounter++;
-        }
-        if (found)
+      //First locate our "All channels" group if any
+      foreach (ChannelGroup group in m_groups)
+      {
+        if (group.GroupName == TvConstants.TvGroupNames.AllChannels)
         {
-          m_zapChannelNr = channelNr;
+          allChannelsGroup = group;
+          break;
         }
       }
+
+      // We want to make sure of two things:
+      //    * We remain in "All channels" group if we were already in it.
+      //    * If we are not in "All channels" we only switch to it as last resort.
+
+      // Check if our current group is our "All channels" group
+      if (m_currentgroup == GetGroupIndex(TvConstants.TvGroupNames.AllChannels))
+      {
+        // If "All channels" group is the current group then scan only that one
+        ZapToChannelNumberFromGroup(allChannelsGroup, aChannelNumber, aUseZapDelay);
+      }
+      else
+      {
+        // Otherwise scan all standard group first and "All channels" group last
+        // Check all our standard groups first
+        foreach (ChannelGroup group in m_groups)
+        {
+          // Skip all channel group as it needs to be done last
+          if (group == allChannelsGroup)
+          {
+            continue;
+          }
+
+          if (ZapToChannelNumberFromGroup(group, aChannelNumber, aUseZapDelay))
+          {
+            // We zapped to our channel, we are done now
+            return;
+          }
+        }
+
+        // Our channel was not found in any of our standard group
+        // Now check if it is in our "All channels" group
+        ZapToChannelNumberFromGroup(allChannelsGroup, aChannelNumber, aUseZapDelay);
+      }
+    }
+
+    /// <summary>
+    /// Search the given group for the specified channel and switch to it if found.
+    /// </summary>
+    /// <param name="aGroup"></param>
+    /// <param name="aChannelNumber"></param>
+    /// <param name="aUseZapDelay"></param>
+    /// <returns></returns>
+    private bool ZapToChannelNumberFromGroup(ChannelGroup aGroup, int aChannelNumber, bool aUseZapDelay)
+    {
+      IList<GroupMap> channels = aGroup.ReferringGroupMap();
+
+      Log.Debug("channels.Count {0}", channels.Count);
+
+      int iCounter = 0;
+
+      foreach (GroupMap gm in channels)
+      {
+        Channel chan = gm.ReferencedChannel();
+
+        Log.Debug("chan {0}", chan.DisplayName);
+        if (chan.VisibleInGuide)
+        {
+          if (chan.ChannelNumber == aChannelNumber)
+          {
+            Log.Debug("find channel: iCounter {0}, chan.ChannelNumber {1}, chan.DisplayName {2}, channels.Count {3}",
+                      iCounter, chan.ChannelNumber, chan.DisplayName, channels.Count);
+            // Change our group 
+            SetCurrentGroup(aGroup.GroupName);
+            // Change our channel 
+            ZapToChannel(iCounter + 1, aUseZapDelay);
+            m_zapChannelNr = aChannelNumber;
+            // We found our channel we are done here
+            return true;
+          }
+        }
+        iCounter++;
+      }
+
+      return false;
     }
 
     /// <summary>
