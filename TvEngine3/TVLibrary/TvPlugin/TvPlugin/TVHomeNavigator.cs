@@ -75,8 +75,13 @@ namespace TvPlugin
 
     #region Private members
 
-    private List<ChannelGroup> m_groups = new List<ChannelGroup>();
     // Contains all channel groups (including an "all channels" group)
+    private List<ChannelGroup> m_groups = new List<ChannelGroup>();
+    /// <summary>
+    /// Provide quick access to all channel group.
+    /// Will be null if our 'all channels' group is hidden.
+    /// </summary>
+    private ChannelGroup m_AllChannelsGroup = null;
 
     private int m_currentgroup = 0;
     private DateTime m_zaptime;
@@ -175,6 +180,7 @@ namespace TvPlugin
           Log.Info("found:{0} tv channels", channels.Count);
           TvNotifyManager.OnNotifiesChanged();
           m_groups.Clear();
+          m_AllChannelsGroup = null;
 
           TvBusinessLayer layer = new TvBusinessLayer();
           RadioChannelGroup allRadioChannelsGroup =
@@ -247,6 +253,10 @@ namespace TvPlugin
             if (hideAllChannelsGroup && group.GroupName.Equals(TvConstants.TvGroupNames.AllChannels) && groups.Count > 1)
             {
               continue;
+            }
+            else if (m_AllChannelsGroup == null && group.GroupName.Equals(TvConstants.TvGroupNames.AllChannels))
+            {
+              m_AllChannelsGroup = group;
             }
             m_groups.Add(group);
           }
@@ -585,51 +595,44 @@ namespace TvPlugin
         return;
       }
 
-      ChannelGroup allChannelsGroup = null;
+      // Search for number match in our current group first.
+      // This is to make sure we remain in current group if possible.
+      ChannelGroup currentGroup = CurrentGroup;
+      if (ZapToChannelNumberFromGroup(currentGroup, aChannelNumber, aUseZapDelay))
+      {
+        // We zapped to our channel, we are done now
+        return;
+      }
 
-      //First locate our "All channels" group if any
+      // If our current group contains all our channels then its pointless continuing that search
+      if (currentGroup==m_AllChannelsGroup)
+      {
+        return;
+      }
+
+      // We did not find that channel in our current group.
+      // Scan all groups in the order defined by the user through our TV configuration tool.
       foreach (ChannelGroup group in m_groups)
       {
-        if (group.GroupName == TvConstants.TvGroupNames.AllChannels)
+        // Skip 'all channels' group as it needs to be done last
+        if (group == currentGroup || group == m_AllChannelsGroup)
         {
-          allChannelsGroup = group;
-          break;
+          continue;
+        }
+
+        if (ZapToChannelNumberFromGroup(group, aChannelNumber, aUseZapDelay))
+        {
+          // We zapped to our channel, we are done now
+          return;
         }
       }
 
-      // We want to make sure of two things:
-      //    * We remain in "All channels" group if we were already in it.
-      //    * If we are not in "All channels" we only switch to it as last resort.
-
-      // Check if our current group is our "All channels" group
-      if (m_currentgroup == GetGroupIndex(TvConstants.TvGroupNames.AllChannels))
+      // Our channel was not found in any of our standard group
+      // Now check if it is in our "All channels" group
+      if (currentGroup != m_AllChannelsGroup) // Skip that if we already searched our 'all channels' group.
       {
-        // If "All channels" group is the current group then scan only that one
-        ZapToChannelNumberFromGroup(allChannelsGroup, aChannelNumber, aUseZapDelay);
-      }
-      else
-      {
-        // Otherwise scan all standard group first and "All channels" group last
-        // Check all our standard groups first
-        foreach (ChannelGroup group in m_groups)
-        {
-          // Skip all channel group as it needs to be done last
-          if (group == allChannelsGroup)
-          {
-            continue;
-          }
-
-          if (ZapToChannelNumberFromGroup(group, aChannelNumber, aUseZapDelay))
-          {
-            // We zapped to our channel, we are done now
-            return;
-          }
-        }
-
-        // Our channel was not found in any of our standard group
-        // Now check if it is in our "All channels" group
-        ZapToChannelNumberFromGroup(allChannelsGroup, aChannelNumber, aUseZapDelay);
-      }
+        ZapToChannelNumberFromGroup(m_AllChannelsGroup, aChannelNumber, aUseZapDelay);
+      }      
     }
 
     /// <summary>
@@ -638,9 +641,14 @@ namespace TvPlugin
     /// <param name="aGroup"></param>
     /// <param name="aChannelNumber"></param>
     /// <param name="aUseZapDelay"></param>
-    /// <returns></returns>
+    /// <returns>True if we did zap succesfully to the given channel number, false otherwise.</returns>
     private bool ZapToChannelNumberFromGroup(ChannelGroup aGroup, int aChannelNumber, bool aUseZapDelay)
     {
+      if (aGroup==null)
+      {
+        return false;
+      }
+
       IList<GroupMap> channels = aGroup.ReferringGroupMap();
 
       Log.Debug("channels.Count {0}", channels.Count);
